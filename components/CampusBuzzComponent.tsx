@@ -52,6 +52,7 @@ const CampusBuzzComponent = () => {
   const buttonBackgroundColor = Colors.light.icon;
 
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [history, setHistory] = useState<number[]>([]); // To store previous indices
   const translateX = useSharedValue(0);
   const rotate = useSharedValue(0);
 
@@ -62,9 +63,20 @@ const CampusBuzzComponent = () => {
   };
 
   const onSwipe = (direction: 'left' | 'right') => {
+    setHistory((prevHistory) => [...prevHistory, currentIndex]); // Save current index to history
     setCurrentIndex((prevIndex) => (prevIndex + 1) % DATA.length);
     translateX.value = 0;
     rotate.value = 0;
+  };
+
+  const undoSwipe = () => {
+    if (history.length > 0) {
+      const previousIndex = history[history.length - 1];
+      setHistory((prevHistory) => prevHistory.slice(0, prevHistory.length - 1)); // Remove last item from history
+      setCurrentIndex(previousIndex);
+      translateX.value = withSpring(0, { damping: 20, stiffness: 150 }); // Reset card position
+      rotate.value = withSpring(0, { damping: 20, stiffness: 150 }); // Reset card rotation
+    }
   };
 
   type CardAnimatedGestureContext = {
@@ -81,14 +93,14 @@ const CampusBuzzComponent = () => {
     },
     onEnd: (event) => {
       if (event.translationX > SWIPE_THRESHOLD) {
-        translateX.value = withSpring(500);
+        translateX.value = withSpring(500, { damping: 20, stiffness: 150 });
         runOnJS(onSwipe)('right');
       } else if (event.translationX < -SWIPE_THRESHOLD) {
-        translateX.value = withSpring(-500);
+        translateX.value = withSpring(-500, { damping: 20, stiffness: 150 });
         runOnJS(onSwipe)('left');
       } else {
-        translateX.value = withSpring(0);
-        rotate.value = withSpring(0);
+        translateX.value = withSpring(0, { damping: 20, stiffness: 150 });
+        rotate.value = withSpring(0, { damping: 20, stiffness: 150 });
       }
     },
   });
@@ -111,7 +123,7 @@ const CampusBuzzComponent = () => {
         <View style={[styles.header, { borderBottomColor: tintColor }]}>
           <Text style={[styles.companyName, { color: textColor }]}>Noblex - Campus Buzz</Text>
           <View style={styles.headerIcons}>
-            <HapticTab>
+            <HapticTab onPress={undoSwipe}>
               <IconSymbol name="arrow.uturn.backward" size={24} color={textColor} />
             </HapticTab>
             <HapticTab onPress={toggleDock}>
