@@ -1,7 +1,7 @@
 import { Colors } from '@/constants/Colors';
 import { useThemeColor } from '@/hooks/useThemeColor';
 import * as Haptics from 'expo-haptics';
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { BackHandler, Dimensions, Image, Platform, StatusBar, StyleSheet, Text, TouchableNativeFeedback, TouchableOpacity, TouchableWithoutFeedback, View } from 'react-native';
 import { PanGestureHandler } from 'react-native-gesture-handler';
 import Animated, {
@@ -62,7 +62,7 @@ const CampusBuzzComponent = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const translateX = useSharedValue(0);
   const rotate = useSharedValue(0);
-  const isAnimating = useRef(false); // To prevent multiple animations from firing
+  const isAnimating = useSharedValue(false); // To prevent multiple animations from firing
 
   const [isSettingsDockOpen, setIsSettingsDockOpen] = useState(false); // Renamed from isDockOpen for clarity
   const [isInfoDockOpen, setIsInfoDockOpen] = useState(false);
@@ -101,30 +101,53 @@ useEffect(() => {
   };
 }, [handleBackPress]);
 
-  const onNavigate = useCallback((targetIndex: number, exitDirection: 'left' | 'right', entryDirection: 'left' | 'right', withRotation: boolean) => {
-    if (isAnimating.current) return;
-    isAnimating.current = true;
+const onNavigate = useCallback((targetIndex: number, exitDirection: 'left' | 'right', entryDirection: 'left' | 'right', withRotation: boolean) => {
+  'worklet';
+  console.log('onNavigate called. isAnimating:', isAnimating.value, 'targetIndex:', targetIndex);
+  if (isAnimating.value) {
+    console.log('Animation already in progress, returning.');
+    return;
+  }
+  isAnimating.value = true;
+  console.log('isAnimating set to true.');
 
-    const exitTargetX = exitDirection === 'right' ? SCREEN_WIDTH : -SCREEN_WIDTH;
-    const entryStartX = entryDirection === 'right' ? -SCREEN_WIDTH : SCREEN_WIDTH;
+  const exitTargetX = exitDirection === 'right' ? SCREEN_WIDTH : -SCREEN_WIDTH;
+  const entryStartX = entryDirection === 'right' ? -SCREEN_WIDTH : SCREEN_WIDTH;
 
-    translateX.value = withSpring(exitTargetX, { damping: 20, stiffness: 150 }, (finished) => {
-      if (finished) {
-        runOnJS(setCurrentIndex)(targetIndex);
-        runOnJS(() => {
-          translateX.value = entryStartX;
-          translateX.value = withSpring(0, { damping: 20, stiffness: 150 }, () => {
-            isAnimating.current = false;
-          });
+  translateX.value = withSpring(exitTargetX, { damping: 20, stiffness: 150 }, (finished) => {
+    'worklet';
+    if (finished) {
+      runOnJS(() => {
+        console.log('Exit animation finished. Setting currentIndex to', targetIndex);
+        setCurrentIndex(targetIndex);
+        translateX.value = entryStartX;
+        translateX.value = withSpring(0, { damping: 20, stiffness: 150 }, () => {
+          'worklet';
+          console.log('Entry animation finished.');
+          // This callback fires when translateX entry animation finishes
+          // Now, reset rotation and then finally reset isAnimating
           if (withRotation) {
-            rotate.value = withSpring(0, { damping: 20, stiffness: 150 });
+            rotate.value = withSpring(0, { damping: 20, stiffness: 150 }, () => {
+              'worklet';
+              isAnimating.value = false; // Reset after rotation animation
+              console.log('Rotation animation finished. isAnimating set to false.');
+            });
           } else {
-            rotate.value = 0;
+            rotate.value = 0; // No animation, just set to 0
+            isAnimating.value = false; // Reset immediately
+            console.log('No rotation animation. isAnimating set to false.');
           }
-        })();
-      }
-    });
-  }, [translateX, rotate, setCurrentIndex]);
+        });
+      })();
+    } else {
+      // If exit animation interrupted, reset everything
+      console.log('Exit animation interrupted. Snapping back and resetting isAnimating.');
+      translateX.value = withSpring(0, { damping: 20, stiffness: 150 }); // Snap back
+      rotate.value = withSpring(0, { damping: 20, stiffness: 150 }); // Snap back
+      isAnimating.value = false;
+    }
+  });
+}, [translateX, rotate, isAnimating]);
 
   const onSwipeForward = useCallback((direction: 'left' | 'right') => {
     const nextIndex = (currentIndex + 1) % DATA.length;
@@ -140,22 +163,33 @@ useEffect(() => {
     startX: number;
   };
 
-  const panGestureEvent = useAnimatedGestureHandler<any, AnimatedGestureContext>({
-    onStart: (event, ctx) => {
+  const panGestureEvent = useAnimatedGestureHandler({
+    onStart: (event, ctx: any) => {
+      'worklet';
       ctx.startX = translateX.value;
     },
-    onActive: (event, ctx) => {
+    onActive: (event, ctx: any) => {
+      'worklet';
       translateX.value = ctx.startX + event.translationX;
       rotate.value = event.translationX / SWIPE_THRESHOLD;
     },
     onEnd: (event) => {
-      if (event.translationX > SWIPE_THRESHOLD) {
-        runOnJS(onSwipeForward)('right');
-      } else if (event.translationX < -SWIPE_THRESHOLD) {
-        runOnJS(onSwipeForward)('left');
+      'worklet';
+      if (isAnimating.value) {
+        // If an animation is already in progress, snap back without initiating a new swipe
+        translateX.value = withSpring(0, { damping: 20, stiffness: 150 });
+        rotate.value = withSpring(0, { damping: 20, stiffness: 150 });
+        return; // Do not interfere with the ongoing navigation
+      }
+
+      if (Math.abs(event.translationX) > SWIPE_THRESHOLD) {
+        const direction = event.translationX > 0 ? 'right' : 'left';
+        runOnJS(onSwipeForward)(direction);
       } else {
         translateX.value = withSpring(0, { damping: 20, stiffness: 150 });
         rotate.value = withSpring(0, { damping: 20, stiffness: 150 });
+        // No navigation initiated, so ensure isAnimating is false (it should already be false here)
+        isAnimating.value = false;
       }
     },
   });
@@ -181,6 +215,30 @@ useEffect(() => {
     };
   });
 
+  // Settings dock gesture handler
+  const settingsDockGestureHandler = useAnimatedGestureHandler({
+    onStart: (event, ctx: any) => {
+      'worklet';
+      ctx.startY = settingsDockTranslateY.value;
+    },
+    onActive: (event, ctx: any) => {
+      'worklet';
+      settingsDockTranslateY.value = Math.max(
+        HEADER_HEIGHT + 10,
+        ctx.startY + event.translationY
+      );
+    },
+    onEnd: (event) => {
+      'worklet';
+      if (event.translationY > 50) { // If swiped down enough, close
+        settingsDockTranslateY.value = withSpring(SCREEN_HEIGHT, { damping: 20, stiffness: 150 });
+        runOnJS(setIsSettingsDockOpen)(false);
+      } else { // Otherwise, snap back to open position
+        settingsDockTranslateY.value = withSpring(HEADER_HEIGHT + 10, { damping: 20, stiffness: 150 });
+      }
+    },
+  });
+
   const currentCard = DATA[currentIndex];
 
   return (
@@ -190,10 +248,14 @@ useEffect(() => {
         <Text style={[styles.companyName, { color: textColor }]}>Noblex - Campus Buzz</Text>
         <View style={styles.headerIcons}>
           <HapticTab onPress={onUndo}> {/* Call onUndo function */}
-            <IconSymbol name="arrow.uturn.backward" size={24} color={textColor} />
+            <View>
+              <IconSymbol name="arrow.uturn.backward" size={24} color={textColor} />
+            </View>
           </HapticTab>
           <HapticTab onPress={toggleSettingsDock}>
-            <IconSymbol name="slider.horizontal.3" size={24} color={textColor} />
+            <View>
+              <IconSymbol name="slider.horizontal.3" size={24} color={textColor} />
+            </View>
           </HapticTab>
         </View>
       </View>
@@ -265,27 +327,7 @@ useEffect(() => {
 
       {/* Settings Dock from bottom */}
       <Animated.View style={[styles.settingsDock, settingsDockAnimatedStyle, { backgroundColor }]}>
-        <PanGestureHandler
-          onGestureEvent={useAnimatedGestureHandler<any, { startY: number }>({
-            onStart: (event, ctx) => {
-              ctx.startY = settingsDockTranslateY.value;
-            },
-            onActive: (event, ctx) => {
-              settingsDockTranslateY.value = Math.max(
-                HEADER_HEIGHT + 10,
-                ctx.startY + event.translationY
-              );
-            },
-            onEnd: (event) => {
-              if (event.translationY > 50) { // If swiped down enough, close
-                settingsDockTranslateY.value = withSpring(SCREEN_HEIGHT, { damping: 20, stiffness: 150 });
-                runOnJS(setIsSettingsDockOpen)(false);
-              } else { // Otherwise, snap back to open position
-                settingsDockTranslateY.value = withSpring(HEADER_HEIGHT + 10, { damping: 20, stiffness: 150 });
-              }
-            },
-          })}
-        >
+        <PanGestureHandler onGestureEvent={settingsDockGestureHandler}>
           <View style={styles.settingsDockHandle} />
         </PanGestureHandler>
         <View style={styles.settingsDockContent}>
