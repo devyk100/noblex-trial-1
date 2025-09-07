@@ -1,7 +1,9 @@
+import { Colors } from '@/constants/Colors';
 import { useThemeColor } from '@/hooks/useThemeColor';
+import * as Haptics from 'expo-haptics';
 import React, { useState } from 'react';
-import { Image, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { PanGestureHandler } from 'react-native-gesture-handler';
+import { Image, Platform, StatusBar, StyleSheet, Text, TouchableNativeFeedback, TouchableOpacity, View } from 'react-native';
+import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedGestureHandler,
@@ -9,6 +11,7 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import CampusBuzzDock from './CampusBuzzDock'; // Import the new component
 import { HapticTab } from './HapticTab';
 import { IconSymbol } from './ui/IconSymbol';
 
@@ -45,10 +48,18 @@ const CampusBuzzComponent = () => {
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
   const tintColor = useThemeColor({}, 'tint');
+  // Set button background to a fixed gray as requested by the user.
+  const buttonBackgroundColor = Colors.light.icon;
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const translateX = useSharedValue(0);
   const rotate = useSharedValue(0);
+
+  const [isDockOpen, setIsDockOpen] = useState(false);
+
+  const toggleDock = () => {
+    setIsDockOpen((prev) => !prev);
+  };
 
   const onSwipe = (direction: 'left' | 'right') => {
     setCurrentIndex((prevIndex) => (prevIndex + 1) % DATA.length);
@@ -56,11 +67,11 @@ const CampusBuzzComponent = () => {
     rotate.value = 0;
   };
 
-  type AnimatedGestureContext = {
+  type CardAnimatedGestureContext = {
     startX: number;
   };
 
-  const panGestureEvent = useAnimatedGestureHandler<any, AnimatedGestureContext>({
+  const panGestureEvent = useAnimatedGestureHandler<any, CardAnimatedGestureContext>({
     onStart: (event, ctx) => {
       ctx.startX = translateX.value;
     },
@@ -94,46 +105,72 @@ const CampusBuzzComponent = () => {
   const currentCard = DATA[currentIndex];
 
   return (
-    <View style={[styles.container, { backgroundColor }]}>
-      {/* Header */}
-      <View style={[styles.header, { borderBottomColor: tintColor }]}>
-        <Text style={[styles.companyName, { color: textColor }]}>Noblex - Campus Buzz</Text>
-        <View style={styles.headerIcons}>
-          <HapticTab>
-            <IconSymbol name="arrow.uturn.backward" size={24} color={textColor} />
-          </HapticTab>
-          <HapticTab>
-            <IconSymbol name="slider.horizontal.3" size={24} color={textColor} />
-          </HapticTab>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={[styles.container, { backgroundColor }]}>
+        {/* Header */}
+        <View style={[styles.header, { borderBottomColor: tintColor }]}>
+          <Text style={[styles.companyName, { color: textColor }]}>Noblex - Campus Buzz</Text>
+          <View style={styles.headerIcons}>
+            <HapticTab>
+              <IconSymbol name="arrow.uturn.backward" size={24} color={textColor} />
+            </HapticTab>
+            <HapticTab onPress={toggleDock}>
+              <IconSymbol name="slider.horizontal.3" size={24} color={textColor} />
+            </HapticTab>
+          </View>
         </View>
-      </View>
 
-      {/* Main Content */}
-      <View style={styles.mainContent}>
-        <PanGestureHandler onGestureEvent={panGestureEvent}>
-          <Animated.View style={[styles.card, cardStyle]}>
-            {/* Image Section (60%) */}
-            <View style={styles.imageContainer}>
-              <Image
-                source={{ uri: currentCard.image }}
-                style={styles.image}
-              />
-            </View>
+        {/* Main Content */}
+        <View style={styles.mainContent}>
+          <PanGestureHandler onGestureEvent={panGestureEvent}>
+            <Animated.View style={[styles.card, cardStyle]}>
+              {/* Image Section (60%) */}
+              <View style={styles.imageContainer}>
+                <Image
+                  source={{ uri: currentCard.image }}
+                  style={styles.image}
+                />
+              </View>
 
-            {/* Text Section (20%) */}
-            <View style={styles.textContainer}>
-              <Text style={[styles.subheading, { color: textColor }]}>{currentCard.subheading}</Text>
-              <Text style={[styles.text, { color: textColor }]}>
-                {currentCard.text}
-              </Text>
-            </View>
-          </Animated.View>
-        </PanGestureHandler>
-        <TouchableOpacity style={[styles.floatingButton, { backgroundColor: tintColor }]}>
-          <IconSymbol name="plus" size={24} color="white" />
-        </TouchableOpacity>
+              {/* Text Section (20%) */}
+              <View style={styles.textContainer}>
+                <Text style={[styles.subheading, { color: textColor }]}>{currentCard.subheading}</Text>
+                <Text style={[styles.text, { color: textColor }]}>
+                  {currentCard.text}
+                </Text>
+              </View>
+            </Animated.View>
+          </PanGestureHandler>
+          {Platform.OS === 'android' ? (
+            <TouchableNativeFeedback
+              onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+              background={TouchableNativeFeedback.Ripple('rgba(255,255,255,0.3)', true)}
+            >
+              <View style={[styles.floatingButton, { backgroundColor: buttonBackgroundColor }]}>
+                <IconSymbol name="bell" size={24} color="white" />
+              </View>
+            </TouchableNativeFeedback>
+          ) : (
+            <TouchableOpacity
+              onPress={() => Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)}
+              style={[styles.floatingButton, { backgroundColor: buttonBackgroundColor }]}
+            >
+              <IconSymbol name="bell" size={24} color="white" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* CampusBuzzDock Component */}
+        <CampusBuzzDock
+          data={DATA}
+          textColor={textColor}
+          tintColor={tintColor}
+          backgroundColor={backgroundColor}
+          isDockOpen={isDockOpen}
+          toggleDock={toggleDock}
+        />
       </View>
-    </View>
+    </GestureHandlerRootView>
   );
 };
 
@@ -207,7 +244,15 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
+    elevation: 8, // Android shadow
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 4,
+      },
+    }),
   },
 });
 

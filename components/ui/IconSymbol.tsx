@@ -30,6 +30,7 @@ const MAPPING = {
   'dots.horizontal': 'more-horiz',
   'arrow.uturn.backward': 'undo',
   'slider.horizontal.3': 'tune',
+  'bell': 'notifications', // Added mapping for bell icon
 } as any;
 
 /**
