@@ -1,13 +1,97 @@
 import { useThemeColor } from '@/hooks/useThemeColor';
-import React from 'react';
+import React, { useState } from 'react';
 import { Image, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { PanGestureHandler } from 'react-native-gesture-handler';
+import Animated, {
+  runOnJS,
+  useAnimatedGestureHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { HapticTab } from './HapticTab';
 import { IconSymbol } from './ui/IconSymbol';
+
+const DATA = [
+  {
+    id: '1',
+    image: 'https://picsum.photos/seed/picsum/400/600',
+    subheading: 'A Beautiful Subheading 1',
+    text: 'This is some good text that will completely occupy the available space. It can be a description, a story, or any other relevant information.',
+  },
+  {
+    id: '2',
+    image: 'https://picsum.photos/seed/picsum/400/601',
+    subheading: 'Another Great Title 2',
+    text: 'Here is some more interesting content for the second card. It provides additional details and context.',
+  },
+  {
+    id: '3',
+    image: 'https://picsum.photos/seed/picsum/400/602',
+    subheading: 'Third Card\'s Charm 3',
+    text: 'The third card brings new perspectives and information, keeping the user engaged with fresh content.',
+  },
+  {
+    id: '4',
+    image: 'https://picsum.photos/seed/picsum/400/603',
+    subheading: 'Fourth Time\'s the Charm 4',
+    text: 'This is the fourth card, continuing the series with more captivating images and descriptive text.',
+  },
+];
+
+const SWIPE_THRESHOLD = 100;
 
 const CampusBuzzComponent = () => {
   const backgroundColor = useThemeColor({}, 'background');
   const textColor = useThemeColor({}, 'text');
   const tintColor = useThemeColor({}, 'tint');
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const translateX = useSharedValue(0);
+  const rotate = useSharedValue(0);
+
+  const onSwipe = (direction: 'left' | 'right') => {
+    setCurrentIndex((prevIndex) => (prevIndex + 1) % DATA.length);
+    translateX.value = 0;
+    rotate.value = 0;
+  };
+
+  type AnimatedGestureContext = {
+    startX: number;
+  };
+
+  const panGestureEvent = useAnimatedGestureHandler<any, AnimatedGestureContext>({
+    onStart: (event, ctx) => {
+      ctx.startX = translateX.value;
+    },
+    onActive: (event, ctx) => {
+      translateX.value = ctx.startX + event.translationX;
+      rotate.value = event.translationX / SWIPE_THRESHOLD;
+    },
+    onEnd: (event) => {
+      if (event.translationX > SWIPE_THRESHOLD) {
+        translateX.value = withSpring(500);
+        runOnJS(onSwipe)('right');
+      } else if (event.translationX < -SWIPE_THRESHOLD) {
+        translateX.value = withSpring(-500);
+        runOnJS(onSwipe)('left');
+      } else {
+        translateX.value = withSpring(0);
+        rotate.value = withSpring(0);
+      }
+    },
+  });
+
+  const cardStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { translateX: translateX.value },
+        { rotateZ: `${rotate.value * 10}deg` },
+      ],
+    };
+  });
+
+  const currentCard = DATA[currentIndex];
 
   return (
     <View style={[styles.container, { backgroundColor }]}>
@@ -24,29 +108,32 @@ const CampusBuzzComponent = () => {
         </View>
       </View>
 
-        {/* Main Content */}
-        <View style={styles.mainContent}>
-          {/* Image Section (60%) */}
-          <View style={styles.imageContainer}>
-            <Image
-              source={{ uri: 'https://picsum.photos/seed/picsum/400/600' }}
-              style={styles.image}
-            />
-          </View>
+      {/* Main Content */}
+      <View style={styles.mainContent}>
+        <PanGestureHandler onGestureEvent={panGestureEvent}>
+          <Animated.View style={[styles.card, cardStyle]}>
+            {/* Image Section (60%) */}
+            <View style={styles.imageContainer}>
+              <Image
+                source={{ uri: currentCard.image }}
+                style={styles.image}
+              />
+            </View>
 
-          {/* Text Section (20%) */}
-          <View style={styles.textContainer}>
-            <Text style={[styles.subheading, { color: textColor }]}>A Beautiful Subheading</Text>
-            <Text style={[styles.text, { color: textColor }]}>
-              This is some good text that will completely occupy the available space.
-              It can be a description, a story, or any other relevant information.
-            </Text>
-            <TouchableOpacity style={[styles.floatingButton, { backgroundColor: tintColor }]}>
-              <IconSymbol name="plus" size={24} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
+            {/* Text Section (20%) */}
+            <View style={styles.textContainer}>
+              <Text style={[styles.subheading, { color: textColor }]}>{currentCard.subheading}</Text>
+              <Text style={[styles.text, { color: textColor }]}>
+                {currentCard.text}
+              </Text>
+            </View>
+          </Animated.View>
+        </PanGestureHandler>
+        <TouchableOpacity style={[styles.floatingButton, { backgroundColor: tintColor }]}>
+          <IconSymbol name="plus" size={24} color="white" />
+        </TouchableOpacity>
       </View>
+    </View>
   );
 };
 
@@ -61,7 +148,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0, // Re-added this line
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   headerIcons: {
     flexDirection: 'row',
@@ -74,25 +161,34 @@ const styles = StyleSheet.create({
   mainContent: {
     flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 16, // Re-added top padding to separate image from header
+    paddingTop: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  card: {
+    width: '100%',
+    height: '90%',
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'absolute',
   },
   imageContainer: {
-    flex: 0.8, // Give more space to the image
-    // Removed justifyContent and alignItems to make content stick to edges
-    paddingTop: 0, // Ensure no top padding
-    paddingBottom: 0, // Ensure no bottom padding
+    flex: 0.8,
+    paddingTop: 0,
+    paddingBottom: 0,
   },
   image: {
     width: '100%',
     height: '100%',
-    borderRadius: 8, // rounded-sm
+    borderRadius: 8,
   },
   textContainer: {
-    flex: 0.2, // Give less space to the text
-    // Removed justifyContent to make content stick to edges
-    paddingTop: 0, // Ensure no top padding
-    paddingBottom: 16, // Apply bottom padding here for the floating button
-    marginTop: 0, // Ensure no top margin
+    flex: 0.2,
+    paddingTop: 0,
+    paddingBottom: 16,
+    marginTop: 0,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
   },
   subheading: {
     fontSize: 20,
