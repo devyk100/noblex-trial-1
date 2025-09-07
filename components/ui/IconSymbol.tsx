@@ -31,6 +31,8 @@ const MAPPING = {
   'arrow.uturn.backward': 'undo',
   'slider.horizontal.3': 'tune',
   'bell': 'notifications', // Added mapping for bell icon
+  'arrow.backward': 'arrow-back', // Added mapping for back arrow icon
+  'info.circle': 'info', // Added mapping for info circle icon
 } as any;
 
 /**
