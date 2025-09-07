@@ -1,12 +1,8 @@
-import React from 'react'
-import { Text, View } from 'react-native'
+import CampusBuzzComponent from '@/components/CampusBuzzComponent';
+import React from 'react';
 
 const CampusBuzz = () => {
-  return (
-    <View>
-      <Text>CampusBuzz</Text>
-    </View>
-  )
-}
+  return <CampusBuzzComponent />;
+};
 
-export default CampusBuzz
+export default CampusBuzz;

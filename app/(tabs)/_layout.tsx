@@ -32,14 +32,14 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Home',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color, focused }) => <IconSymbol size={28} name="house.fill" color={color} style={{ opacity: focused ? 1 : 0.5 }} />,
         }}
       />
       <Tabs.Screen
         name="experientia/index"
         options={{
           title: 'Experientia',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          tabBarIcon: ({ color, focused }) => <IconSymbol size={28} name="paperplane.fill" color={color} style={{ opacity: focused ? 1 : 0.5 }} />,
         }}
       />
 
@@ -47,20 +47,20 @@ export default function TabLayout() {
         name="campus-buzz/index"
         options={{
           title: 'Campus Buzz',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="megaphone.fill" color={color} />,
+          tabBarIcon: ({ color, focused }) => <IconSymbol size={28} name="megaphone.fill" color={color} style={{ opacity: focused ? 1 : 0.5 }} />,
         }}
       />
 
       <Tabs.Screen name="networking/index"
         options={{
           title: "Networking",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.2.fill" color={color} />,
+          tabBarIcon: ({ color, focused }) => <IconSymbol size={28} name="person.2.fill" color={color} style={{ opacity: focused ? 1 : 0.5 }} />,
         }} />
 
       <Tabs.Screen name="profile/index"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} />,
+          tabBarIcon: ({ color, focused }) => <IconSymbol size={28} name="person.fill" color={color} style={{ opacity: focused ? 1 : 0.5 }} />,
         }}
       />
     </Tabs>
